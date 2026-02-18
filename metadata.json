@@ -1,7 +1,5 @@
 {
-  "name": "StreamX - Ultra Premium Streaming",
-  "description": "A high-performance cinematic streaming engine with AI-driven metadata synthesis and Turso cloud persistence.",
-  "requestFramePermissions": [
-    "camera"
-  ]
+  "name": "StreamX - NextGen Streaming Platform",
+  "description": "A high-performance, Netflix-inspired streaming application with full functional categories, search, my-list features, and a robust admin dashboard.",
+  "requestFramePermissions": []
 }

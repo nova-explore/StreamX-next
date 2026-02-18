@@ -1,226 +1,146 @@
-import { createClient } from '@libsql/client/web';
-import { Media, AppSettings, AppNotification } from '../types';
+import { neon } from '@neondatabase/serverless';
+import { Media, StorageKey, AppSettings } from '../types';
 
-let clientInstance: any = null;
+// Connect to Neon
+const sql = neon(process.env.DATABASE_URL || '');
 
-/**
- * Production Database Client Initializer
- * Securely pulls credentials from the environment.
- */
-const getClient = () => {
-  const url = process.env.TURSO_DATABASE_URL;
-  const authToken = process.env.TURSO_AUTH_TOKEN || "";
-  
-  if (!url) {
-    // In production, we do not log the missing URL to the console to prevent leak of infrastructure details,
-    // but we return null so the app knows it's in a disconnected state.
-    return null;
+const INITIAL_DATA_SEED: Omit<Media, 'id' | 'createdAt'>[] = [
+  {
+    title: 'Echoes of the Void',
+    type: 'movie',
+    thumbnailUrl: 'https://images.unsplash.com/photo-1614850523296-d8c1af93d400?auto=format&fit=crop&q=80&w=1280',
+    videoUrl: 'https://storage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4',
+    description: 'In a distant future, a lone explorer discovers a forgotten frequency that could rewrite history.',
+    year: 2024,
+    genre: 'Sci-Fi',
+    rating: 8.5
   }
-  
-  if (!clientInstance) {
-    try {
-      clientInstance = createClient({ url, authToken });
-    } catch (e) {
-      console.error("Database Connection Failure: Check TURSO_DATABASE_URL and AUTH_TOKEN.");
-      return null;
-    }
-  }
-  return clientInstance;
-};
+];
 
 export const storageService = {
-  /**
-   * Status check for the cloud layer.
-   */
-  isProduction: () => !!process.env.TURSO_DATABASE_URL,
-  
-  /**
-   * Initializes the database schema on boot.
-   */
+  // Initialize Database Tables
   init: async () => {
-    const client = getClient();
-    if (!client) return;
+    if (!process.env.DATABASE_URL) return;
     try {
-      await client.execute(`
+      await sql`
         CREATE TABLE IF NOT EXISTS media (
-          id TEXT PRIMARY KEY, 
-          title TEXT NOT NULL, 
-          type TEXT NOT NULL, 
-          thumbnail_url TEXT, 
-          backdrop_url TEXT, 
-          video_url TEXT, 
-          seasons TEXT, 
-          description TEXT, 
-          year INTEGER, 
-          genre TEXT, 
-          rating REAL, 
-          created_at INTEGER
+          id TEXT PRIMARY KEY,
+          title TEXT NOT NULL,
+          type TEXT NOT NULL,
+          thumbnail_url TEXT,
+          backdrop_url TEXT,
+          video_url TEXT,
+          seasons JSONB,
+          description TEXT,
+          year INTEGER,
+          genre TEXT,
+          rating DECIMAL,
+          created_at BIGINT
         )
-      `);
-      await client.execute(`
+      `;
+      await sql`
         CREATE TABLE IF NOT EXISTS settings (
-          id TEXT PRIMARY KEY, 
-          is_maintenance_mode INTEGER DEFAULT 0
+          id TEXT PRIMARY KEY,
+          is_maintenance_mode BOOLEAN DEFAULT FALSE
         )
-      `);
-      await client.execute(`
-        CREATE TABLE IF NOT EXISTS notifications (
-          id TEXT PRIMARY KEY, 
-          title TEXT NOT NULL, 
-          message TEXT NOT NULL, 
-          thumbnail_url TEXT, 
-          created_at INTEGER
-        )
-      `);
+      `;
+      // Seed if empty
+      const count = await sql`SELECT COUNT(*) FROM media`;
+      if (parseInt(count[0].count) === 0) {
+        for (const item of INITIAL_DATA_SEED) {
+          await storageService.addMedia(item);
+        }
+      }
     } catch (e) {
-      console.error("Schema Initialization Failure:", e);
+      console.error("DB Initialization failed:", e);
     }
   },
 
-  /**
-   * Fetches all media entries from the Turso cloud.
-   * Returns an empty array if the database is disconnected or empty.
-   */
   getMedia: async (): Promise<Media[]> => {
-    const client = getClient();
-    if (!client) return [];
     try {
-      const result = await client.execute("SELECT * FROM media ORDER BY created_at DESC");
-      return result.rows.map((r: any) => ({
+      const rows = await sql`SELECT * FROM media ORDER BY created_at DESC`;
+      return rows.map(r => ({
         id: r.id,
         title: r.title,
         type: r.type as any,
         thumbnailUrl: r.thumbnail_url,
         backdropUrl: r.backdrop_url,
         videoUrl: r.video_url,
-        seasons: r.seasons ? JSON.parse(r.seasons) : [],
+        seasons: r.seasons,
         description: r.description,
         year: r.year,
         genre: r.genre,
-        rating: parseFloat(r.rating || "0"),
-        createdAt: Number(r.created_at || "0")
+        rating: parseFloat(r.rating),
+        createdAt: parseInt(r.created_at)
       }));
-    } catch (err) { 
-      console.error("Fetch Media Error:", err);
-      return []; 
+    } catch (e) {
+      console.error("Fetch failed", e);
+      return [];
     }
   },
 
-  addMedia: async (media: Omit<Media, 'id' | 'createdAt'>): Promise<Media | null> => {
-    const client = getClient();
-    if (!client) return null;
+  addMedia: async (media: Omit<Media, 'id' | 'createdAt'>): Promise<Media> => {
     const id = Math.random().toString(36).substring(2, 11);
     const createdAt = Date.now();
-    try {
-      await client.execute({
-        sql: `INSERT INTO media (id, title, type, thumbnail_url, backdrop_url, video_url, seasons, description, year, genre, rating, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-        args: [id, media.title, media.type, media.thumbnailUrl, media.backdropUrl || null, media.videoUrl || null, JSON.stringify(media.seasons || []), media.description, media.year, media.genre, media.rating, createdAt]
-      });
-      return { ...media, id, createdAt } as Media;
-    } catch (e) {
-      console.error("Insert Media Error:", e);
-      return null;
-    }
-  },
-
-  updateMedia: async (media: Media): Promise<void> => {
-    const client = getClient();
-    if (!client) return;
-    try {
-      await client.execute({
-        sql: `UPDATE media SET title = ?, type = ?, thumbnail_url = ?, backdrop_url = ?, video_url = ?, seasons = ?, description = ?, year = ?, genre = ?, rating = ? WHERE id = ?`,
-        args: [media.title, media.type, media.thumbnailUrl, media.backdropUrl || null, media.videoUrl || null, JSON.stringify(media.seasons || []), media.description, media.year, media.genre, media.rating, media.id]
-      });
-    } catch (e) {
-      console.error("Update Media Error:", e);
-    }
+    await sql`
+      INSERT INTO media (id, title, type, thumbnail_url, backdrop_url, video_url, seasons, description, year, genre, rating, created_at)
+      VALUES (${id}, ${media.title}, ${media.type}, ${media.thumbnailUrl}, ${media.backdropUrl}, ${media.videoUrl || null}, ${JSON.stringify(media.seasons || [])}, ${media.description}, ${media.year}, ${media.genre}, ${media.rating}, ${createdAt})
+    `;
+    return { ...media, id, createdAt };
   },
 
   deleteMedia: async (id: string): Promise<void> => {
-    const client = getClient();
-    if (!client) return;
-    try {
-      await client.execute({ sql: "DELETE FROM media WHERE id = ?", args: [id] });
-    } catch (e) {
-      console.error("Delete Media Error:", e);
-    }
+    await sql`DELETE FROM media WHERE id = ${id}`;
+  },
+
+  updateMedia: async (media: Media): Promise<void> => {
+    await sql`
+      UPDATE media SET 
+        title = ${media.title},
+        type = ${media.type},
+        thumbnail_url = ${media.thumbnailUrl},
+        backdrop_url = ${media.backdropUrl},
+        video_url = ${media.videoUrl || null},
+        seasons = ${JSON.stringify(media.seasons || [])},
+        description = ${media.description},
+        year = ${media.year},
+        genre = ${media.genre},
+        rating = ${media.rating}
+      WHERE id = ${media.id}
+    `;
   },
 
   getSettings: async (): Promise<AppSettings> => {
-    const client = getClient();
-    if (!client) return { isMaintenanceMode: false };
     try {
-      const result = await client.execute("SELECT * FROM settings WHERE id = 'global' LIMIT 1");
-      if (result.rows.length === 0) return { isMaintenanceMode: false };
-      return { isMaintenanceMode: result.rows[0].is_maintenance_mode === 1 };
-    } catch { return { isMaintenanceMode: false }; }
-  },
-
-  setMaintenanceMode: async (enabled: boolean): Promise<void> => {
-    const client = getClient();
-    if (!client) return;
-    try {
-      await client.execute({
-        sql: "INSERT OR REPLACE INTO settings (id, is_maintenance_mode) VALUES ('global', ?)",
-        args: [enabled ? 1 : 0]
-      });
-    } catch (e) {
-      console.error("Update Settings Error:", e);
+      const rows = await sql`SELECT * FROM settings WHERE id = 'global'`;
+      if (rows.length === 0) return { isMaintenanceMode: false };
+      return { isMaintenanceMode: rows[0].is_maintenance_mode };
+    } catch {
+      return { isMaintenanceMode: false };
     }
   },
 
-  getNotifications: async (): Promise<AppNotification[]> => {
-    const client = getClient();
-    if (!client) return [];
-    try {
-      const result = await client.execute("SELECT * FROM notifications ORDER BY created_at DESC LIMIT 10");
-      return result.rows.map((r: any) => ({
-        id: r.id,
-        title: r.title,
-        message: r.message,
-        thumbnailUrl: r.thumbnail_url,
-        createdAt: Number(r.created_at || "0")
-      }));
-    } catch { return []; }
+  updateSettings: async (settings: AppSettings) => {
+    await sql`
+      INSERT INTO settings (id, is_maintenance_mode) 
+      VALUES ('global', ${settings.isMaintenanceMode})
+      ON CONFLICT (id) DO UPDATE SET is_maintenance_mode = ${settings.isMaintenanceMode}
+    `;
   },
 
-  addNotification: async (n: Omit<AppNotification, 'id' | 'createdAt'>) => {
-    const client = getClient();
-    if (!client) return;
-    const id = Math.random().toString(36).substring(2, 11);
-    const createdAt = Date.now();
+  // Helper for local preferences
+  getWatchedProgress: (id: string): number => {
+    const data = localStorage.getItem(StorageKey.WATCHED_PROGRESS);
+    if (!data) return 0;
     try {
-      await client.execute({
-        sql: `INSERT INTO notifications (id, title, message, thumbnail_url, created_at) VALUES (?, ?, ?, ?, ?)`,
-        args: [id, n.title, n.message, n.thumbnailUrl || null, createdAt]
-      });
-    } catch (e) {
-      console.error("Insert Notification Error:", e);
-    }
-  },
-
-  clearNotifications: async () => {
-    const client = getClient();
-    if (!client) return;
-    try {
-      await client.execute("DELETE FROM notifications");
-    } catch (e) {
-      console.error("Clear Notifications Error:", e);
-    }
+      return JSON.parse(data)[id] || 0;
+    } catch { return 0; }
   },
 
   setWatchedProgress: (id: string, progress: number) => {
-    try {
-      const data = JSON.parse(localStorage.getItem('streamx_watched_progress') || '{}');
-      data[id] = progress;
-      localStorage.setItem('streamx_watched_progress', JSON.stringify(data));
-    } catch {}
-  },
-
-  getWatchedProgress: (id: string): number => {
-    try {
-      const data = JSON.parse(localStorage.getItem('streamx_watched_progress') || '{}');
-      return data[id] || 0;
-    } catch { return 0; }
+    const data = localStorage.getItem(StorageKey.WATCHED_PROGRESS);
+    const map = data ? JSON.parse(data) : {};
+    map[id] = progress;
+    localStorage.setItem(StorageKey.WATCHED_PROGRESS, JSON.stringify(map));
   }
 };

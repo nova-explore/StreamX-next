@@ -14,28 +14,46 @@ const hideLoader = () => {
   }
 };
 
+const displayError = (err: any) => {
+  const loaderText = document.getElementById('loader-text');
+  if (loaderText) {
+    loaderText.innerHTML = `
+      <span style="color: #ff4444; font-size: 14px;">Mounting Error</span><br/>
+      <small style="text-transform: none; color: #666; display: block; margin-top: 10px; font-weight: normal; letter-spacing: normal;">
+        ${err instanceof Error ? err.message : 'Unknown initialization failure.'}
+      </small>
+      <button onclick="location.reload()" style="margin-top: 20px; background: #222; border: 1px solid #333; color: #29A829; padding: 8px 20px; border-radius: 8px; cursor: pointer; font-weight:bold;">Try Again</button>
+    `;
+    const spinner = document.querySelector('.spinner') as HTMLElement;
+    if (spinner) spinner.style.borderColor = 'rgba(255, 68, 68, 0.2)';
+  }
+};
+
 if (container) {
-  const root = createRoot(container);
-  
   try {
+    // Expose React globally to help some ESM modules find it
+    (window as any).React = React;
+
+    const root = createRoot(container);
+    
     root.render(
       <React.StrictMode>
         <App />
       </React.StrictMode>
     );
-    
-    // Smooth transition from loader to app
-    if (document.readyState === 'complete') {
-      setTimeout(hideLoader, 500);
-    } else {
-      window.addEventListener('load', () => setTimeout(hideLoader, 500));
-    }
-    
-    // Fallback safety for the loader
-    setTimeout(hideLoader, 3000);
+
+    // Give the browser time to finish the first paint before hiding the loading overlay
+    window.addEventListener('load', () => {
+        setTimeout(hideLoader, 500);
+    });
+
+    // Failsafe for hideLoader
+    setTimeout(hideLoader, 2000);
+
   } catch (error) {
-    console.error("Secure Mount Failure:", error);
-    // In case of a catastrophic crash, at least hide the loader
-    hideLoader();
+    console.error("Critical React Mount Failure:", error);
+    displayError(error);
   }
+} else {
+  console.error("Critical Failure: Root element not found.");
 }

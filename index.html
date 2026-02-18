@@ -2,28 +2,25 @@
 <html lang="en">
 <head>
     <script>
-        /**
-         * SECURE ENVIRONMENT SHIM
-         * Standardizes the process.env object for the browser environment.
-         * Sensitive credentials are read directly from the environment at runtime.
-         */
-        window.process = window.process || { env: {} };
+        // CRITICAL: Define globals immediately
+        window.process = window.process || { env: { 
+          API_KEY: "",
+          DATABASE_URL: "",
+          ADMIN_PASSWORD: ""
+        }};
         window.global = window.global || window;
 
         window.addEventListener('error', function(e) {
             const loaderText = document.getElementById('loader-text');
             if (loaderText) {
-                loaderText.innerHTML = '<span style="color:#ff4444; font-weight:900;">SECURE BOOT ERROR</span><br/><small style="color:#666; font-size:9px; text-transform:none;">' + e.message + '</small>';
+                loaderText.innerHTML = '<span style="color:#ff4444; font-weight:900;">BOOT ERROR</span><br/><small style="color:#666; font-size:9px; text-transform:none; letter-spacing:0;">' + e.message + '</small>';
+                loaderText.style.color = "#ff4444";
             }
         });
     </script>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>StreamX | Premium Cloud Streaming</title>
-    
-    <!-- Favicon Fix: Inline SVG Data URI to prevent 404 logs -->
-    <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><rect width=%22100%22 height=%22100%22 rx=%2220%22 fill=%22%2329A829%22/><text x=%2250%%22 y=%2250%%22 dominant-baseline=%22central%22 text-anchor=%22middle%22 fill=%22white%22 font-size=%2260%22 font-family=%22Inter, Arial%22 font-weight=%22bold%22 font-style=%22italic%22>S</text></svg>">
-
+    <title>StreamX | Your Ultimate Movie Hub</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script>
         tailwind.config = {
@@ -54,6 +51,12 @@
         ::-webkit-scrollbar-thumb { background: #333; border-radius: 10px; }
         ::-webkit-scrollbar-thumb:hover { background: #29A829; }
         
+        @keyframes breathe {
+            0%, 100% { opacity: 0.4; transform: scale(1); }
+            50% { opacity: 0.6; transform: scale(1.05); }
+        }
+        .animate-breathe { animation: breathe 8s ease-in-out infinite; }
+
         #app-loader {
             position: fixed; inset: 0; background: #000;
             display: flex; flex-direction: column; align-items: center; justify-content: center;
@@ -75,10 +78,9 @@
     "react-router-dom": "https://esm.sh/react-router-dom@7.1.3?deps=react@19.0.0,react-dom@19.0.0",
     "lucide-react": "https://esm.sh/lucide-react@0.474.0?deps=react@19.0.0",
     "@google/genai": "https://esm.sh/@google/genai@1.41.0",
-    "@libsql/client/web": "https://esm.sh/@libsql/client@0.14.0/web",
+    "@neondatabase/serverless": "https://esm.sh/@neondatabase/serverless@0.10.4",
     "react-dom/": "https://esm.sh/react-dom@^19.2.4/",
-    "react/": "https://esm.sh/react@^19.2.4/",
-    "@libsql/client/": "https://esm.sh/@libsql/client@^0.17.0/"
+    "react/": "https://esm.sh/react@^19.2.4/"
   }
 }
 </script>
@@ -87,7 +89,7 @@
 <body>
     <div id="app-loader">
         <div class="spinner"></div>
-        <div id="loader-text" style="color: #444; font-size: 10px; font-weight: 900; letter-spacing: 0.2em; text-transform: uppercase; font-style: italic; text-align: center;">Verifying Secure Environment</div>
+        <div id="loader-text" style="color: #444; font-size: 10px; font-weight: 900; letter-spacing: 0.2em; text-transform: uppercase; font-style: italic; text-align: center;">Initializing StreamX Engine</div>
     </div>
     <div id="root"></div>
 <script type="module" src="/index.tsx"></script>

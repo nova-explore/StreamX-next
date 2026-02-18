@@ -1,8 +1,9 @@
+
 import React, { useRef, useState, useEffect } from 'react';
 import { 
-  Play, Pause, Volume2, Volume1, VolumeX, Maximize, ArrowLeft, 
-  RotateCcw, RotateCw, Settings, Check, Gauge, Monitor, 
-  MonitorPlay, Badge
+  Play, Pause, Volume2, VolumeX, Maximize, ArrowLeft, 
+  RotateCcw, RotateCw, Settings, ChevronRight, 
+  MonitorPlay, Check, Gauge, Monitor
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 
@@ -20,22 +21,13 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ url, title }) => {
 
   const [isPlaying, setIsPlaying] = useState(false);
   const [progress, setProgress] = useState(0);
-  const [currentTime, setCurrentTime] = useState(0);
-  const [duration, setDuration] = useState(0);
   const [showControls, setShowControls] = useState(true);
-  const [volume, setVolume] = useState(0.5); // Initial volume at 50%
+  const [volume, setVolume] = useState(1);
   const [isMuted, setIsMuted] = useState(false);
   const [playbackRate, setPlaybackRate] = useState(1);
   const [quality, setQuality] = useState('Auto');
   const [activeMenu, setActiveMenu] = useState<MenuType>('root');
   const [showSettings, setShowSettings] = useState(false);
-
-  // Set initial volume on video load
-  useEffect(() => {
-    if (videoRef.current) {
-      videoRef.current.volume = volume;
-    }
-  }, []);
 
   useEffect(() => {
     let timeout: any;
@@ -105,18 +97,8 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ url, title }) => {
 
   const handleProgress = () => {
     if (videoRef.current) {
-      const current = videoRef.current.currentTime;
-      const total = videoRef.current.duration;
-      setCurrentTime(current);
-      setDuration(total);
-      const prog = (current / total) * 100;
-      setProgress(isNaN(prog) ? 0 : prog);
-    }
-  };
-
-  const handleLoadedMetadata = () => {
-    if (videoRef.current) {
-      setDuration(videoRef.current.duration);
+      const current = (videoRef.current.currentTime / videoRef.current.duration) * 100;
+      setProgress(isNaN(current) ? 0 : current);
     }
   };
 
@@ -173,12 +155,6 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ url, title }) => {
     setActiveMenu('root');
   };
 
-  const getVolumeIcon = () => {
-    if (isMuted || volume === 0) return <VolumeX className="w-8 h-8 text-brand" />;
-    if (volume < 0.5) return <Volume1 className="w-8 h-8" />;
-    return <Volume2 className="w-8 h-8" />;
-  };
-
   return (
     <div 
       ref={containerRef} 
@@ -190,7 +166,6 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ url, title }) => {
         src={url}
         className="max-h-full w-full object-contain cursor-none"
         onTimeUpdate={handleProgress}
-        onLoadedMetadata={handleLoadedMetadata}
         onPlay={() => setIsPlaying(true)}
         onPause={() => setIsPlaying(false)}
         onClick={togglePlay}
@@ -215,11 +190,7 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ url, title }) => {
           </button>
           
           <div className="flex items-center space-x-8">
-            <div className="hidden md:flex items-center space-x-3 bg-brand/10 border border-brand/20 px-5 py-2 rounded-full shadow-lg shadow-brand/10">
-              {/* Fix: Replaced non-existent 'BadgeHd' icon with 'Badge' from 'lucide-react' */}
-              <Badge className="w-4 h-4 text-brand" />
-              <span className="text-[9px] font-black uppercase tracking-widest italic text-brand">Ultra HD 4K Active</span>
-            </div>
+            <span className="hidden md:block bg-brand/10 border border-brand/20 px-5 py-2 rounded-full text-[9px] font-black uppercase tracking-widest italic text-brand shadow-lg shadow-brand/10">Ultra HD 4K Active</span>
             <MonitorPlay className="w-8 h-8 text-white/20" />
           </div>
         </div>
@@ -251,7 +222,7 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ url, title }) => {
         {/* Minimal Bottom Bar */}
         <div className="space-y-10" onClick={(e) => e.stopPropagation()}>
           {/* Progress Bar: Elegant Line */}
-          <div className="group/progress relative w-full h-1.5 bg-white/10 rounded-full cursor-pointer transition-all hover:h-2.5" onClick={seek}>
+          <div className="group/progress relative w-full h-1 bg-white/10 rounded-full cursor-pointer transition-all hover:h-2" onClick={seek}>
             <div 
               className="absolute h-full bg-brand rounded-full transition-all duration-100 ease-linear shadow-[0_0_20px_rgba(41,168,41,0.8)]"
               style={{ width: `${progress}%` }}
@@ -264,16 +235,16 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ url, title }) => {
           </div>
 
           <div className="flex items-center justify-between">
-            <div className="flex items-center space-x-6 md:space-x-10">
+            <div className="flex items-center space-x-10">
               <button onClick={togglePlay} className="hover:scale-125 transition-transform">
                 {isPlaying ? <Pause className="w-8 h-8 fill-white" /> : <Play className="w-8 h-8 fill-white" />}
               </button>
               
               <div className="flex items-center space-x-4 group/vol relative">
                 <button onClick={toggleMute} className="hover:scale-125 transition-transform text-white/60 hover:text-white">
-                  {getVolumeIcon()}
+                  {isMuted ? <VolumeX className="w-8 h-8 text-brand" /> : <Volume2 className="w-8 h-8" />}
                 </button>
-                <div className="w-24 md:w-0 group-hover/vol:w-40 transition-all duration-500 overflow-hidden flex items-center ml-2">
+                <div className="w-0 group-hover/vol:w-40 transition-all duration-500 overflow-hidden flex items-center ml-2">
                   <input
                     type="range"
                     min="0"
@@ -281,62 +252,55 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ url, title }) => {
                     step="0.05"
                     value={isMuted ? 0 : volume}
                     onChange={handleVolumeChange}
-                    className="w-full h-1 bg-white/20 appearance-none accent-brand cursor-pointer rounded-full hover:bg-white/40"
+                    className="w-full h-1 bg-white/10 appearance-none accent-brand cursor-pointer rounded-full"
                     style={{ WebkitAppearance: 'none' }}
                   />
                 </div>
               </div>
 
-              {/* Persistent Time Display */}
-              <div className="flex items-center space-x-3 md:space-x-4 text-[10px] md:text-sm font-black italic tracking-[0.15em] md:tracking-[0.2em] select-none">
-                <span className="text-white drop-shadow-md">{formatTime(currentTime)}</span>
+              <div className="hidden md:flex items-center space-x-4 text-sm font-black italic tracking-[0.2em]">
+                <span className="text-white">{videoRef.current ? formatTime(videoRef.current.currentTime) : '00:00'}</span>
                 <span className="text-white/20">/</span>
-                <span className="text-white/40 drop-shadow-md">{formatTime(duration)}</span>
+                <span className="text-white/40">{videoRef.current ? formatTime(videoRef.current.duration) : '00:00'}</span>
               </div>
             </div>
 
-            <div className="flex items-center space-x-6 md:space-x-12 relative">
+            <div className="flex items-center space-x-12 relative">
               <div className="relative">
                 <button 
                   onClick={toggleSettings}
-                  className={`p-3 rounded-full hover:bg-white/10 transition-all ${showSettings ? 'text-brand scale-110' : 'text-white/60 hover:text-white'}`}
+                  className={`p-3 rounded-full hover:bg-white/10 transition-all ${showSettings ? 'text-brand' : 'text-white/60 hover:text-white'}`}
                 >
                   <Settings className="w-8 h-8" />
                 </button>
                 
                 {showSettings && (
-                  <div className="absolute bottom-full right-0 mb-10 bg-[#0a0a0a]/95 border border-white/10 rounded-[2.5rem] shadow-[0_0_100px_rgba(0,0,0,0.8)] py-6 w-64 animate-in fade-in slide-in-from-bottom-6 duration-300 backdrop-blur-3xl z-[120]">
+                  <div className="absolute bottom-full right-0 mb-10 bg-[#0a0a0a]/90 border border-white/10 rounded-[2.5rem] shadow-2xl py-6 w-64 animate-in fade-in slide-in-from-bottom-6 duration-500 backdrop-blur-3xl">
                     {activeMenu === 'root' && (
                       <div className="space-y-1">
-                        <p className="px-8 py-3 text-[9px] font-black text-white/20 uppercase tracking-[0.5em] mb-4 border-b border-white/5">Playback Config</p>
+                        <p className="px-8 py-3 text-[9px] font-black text-white/20 uppercase tracking-[0.5em] mb-4">Core Engine</p>
                         
                         <button 
                           onClick={() => setActiveMenu('quality')}
-                          className="w-full flex items-center justify-between px-8 py-5 hover:bg-white/5 transition-all group"
+                          className="w-full flex items-center justify-between px-8 py-4 hover:bg-white/5 transition-all group"
                         >
-                          <div className="flex items-center space-x-4">
-                            <Monitor className="w-4 h-4 text-gray-500 group-hover:text-brand transition-colors" />
-                            <span className="text-sm font-black uppercase italic tracking-tighter text-white/60 group-hover:text-white">Resolution</span>
-                          </div>
-                          <span className="text-brand text-[10px] font-black bg-brand/10 px-2 py-0.5 rounded-md">{quality}</span>
+                          <span className="text-sm font-black uppercase italic tracking-tighter text-white/60 group-hover:text-white">Quality</span>
+                          <span className="text-brand text-[10px] font-black">{quality}</span>
                         </button>
 
                         <button 
                           onClick={() => setActiveMenu('speed')}
-                          className="w-full flex items-center justify-between px-8 py-5 hover:bg-white/5 transition-all group"
+                          className="w-full flex items-center justify-between px-8 py-4 hover:bg-white/5 transition-all group"
                         >
-                          <div className="flex items-center space-x-4">
-                            <Gauge className="w-4 h-4 text-gray-500 group-hover:text-brand transition-colors" />
-                            <span className="text-sm font-black uppercase italic tracking-tighter text-white/60 group-hover:text-white">Playback Speed</span>
-                          </div>
-                          <span className="text-brand text-[10px] font-black bg-brand/10 px-2 py-0.5 rounded-md">{playbackRate}x</span>
+                          <span className="text-sm font-black uppercase italic tracking-tighter text-white/60 group-hover:text-white">Speed</span>
+                          <span className="text-brand text-[10px] font-black">{playbackRate}x</span>
                         </button>
                       </div>
                     )}
 
                     {activeMenu === 'speed' && (
                       <div className="space-y-1">
-                        <button onClick={() => setActiveMenu('root')} className="w-full px-8 py-3 text-[9px] font-black text-brand uppercase tracking-[0.5em] mb-4 flex items-center hover:bg-white/5">
+                        <button onClick={() => setActiveMenu('root')} className="w-full px-8 py-3 text-[9px] font-black text-brand uppercase tracking-[0.5em] mb-4 flex items-center">
                            <ArrowLeft className="w-3 h-3 mr-2" /> Speed Control
                         </button>
                         {[0.5, 0.75, 1, 1.25, 1.5, 2].map((rate) => (
@@ -345,7 +309,7 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ url, title }) => {
                             onClick={() => changePlaybackRate(rate)}
                             className={`w-full text-left px-8 py-3.5 hover:bg-white/5 text-xs font-black uppercase italic tracking-tighter transition-all flex items-center justify-between ${playbackRate === rate ? 'text-brand' : 'text-white/40'}`}
                           >
-                            <span>{rate === 1 ? 'Neutral (1x)' : `${rate}x`}</span>
+                            <span>{rate === 1 ? 'Neutral' : `${rate}x`}</span>
                             {playbackRate === rate && <Check className="w-4 h-4" />}
                           </button>
                         ))}
@@ -354,8 +318,8 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ url, title }) => {
 
                     {activeMenu === 'quality' && (
                       <div className="space-y-1">
-                        <button onClick={() => setActiveMenu('root')} className="w-full px-8 py-3 text-[9px] font-black text-brand uppercase tracking-[0.5em] mb-4 flex items-center hover:bg-white/5">
-                           <ArrowLeft className="w-3 h-3 mr-2" /> Video Quality
+                        <button onClick={() => setActiveMenu('root')} className="w-full px-8 py-3 text-[9px] font-black text-brand uppercase tracking-[0.5em] mb-4 flex items-center">
+                           <ArrowLeft className="w-3 h-3 mr-2" /> Visual Engine
                         </button>
                         {['4K Ultra', 'Full HD', '720p', 'Auto'].map((q) => (
                           <button
@@ -384,17 +348,13 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ url, title }) => {
       <style>{`
         input[type=range]::-webkit-slider-thumb {
           -webkit-appearance: none;
-          height: 14px;
-          width: 14px;
+          height: 12px;
+          width: 12px;
           border-radius: 50%;
           background: #29A829;
           cursor: pointer;
           border: 2px solid white;
           box-shadow: 0 0 15px rgba(41, 168, 41, 0.8);
-          transition: transform 0.2s;
-        }
-        input[type=range]::-webkit-slider-thumb:hover {
-          transform: scale(1.3);
         }
       `}</style>
     </div>
@@ -402,7 +362,7 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ url, title }) => {
 };
 
 const formatTime = (seconds: number) => {
-  if (isNaN(seconds) || seconds < 0) return '00:00';
+  if (isNaN(seconds)) return '00:00';
   const h = Math.floor(seconds / 3600);
   const m = Math.floor((seconds % 3600) / 60);
   const s = Math.floor(seconds % 60);
