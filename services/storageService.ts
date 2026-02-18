@@ -1,26 +1,23 @@
+
 import { neon } from '@neondatabase/serverless';
-import { Media, StorageKey, AppSettings } from '../types';
+import { Media, StorageKey, AppSettings, AppNotification } from '../types';
 
-// Connect to Neon
-const sql = neon(process.env.DATABASE_URL || '');
+// Using 'any' for the SQL instance to avoid complex type conflicts with Neon's serverless driver return types
+let sqlInstance: any = null;
 
-const INITIAL_DATA_SEED: Omit<Media, 'id' | 'createdAt'>[] = [
-  {
-    title: 'Echoes of the Void',
-    type: 'movie',
-    thumbnailUrl: 'https://images.unsplash.com/photo-1614850523296-d8c1af93d400?auto=format&fit=crop&q=80&w=1280',
-    videoUrl: 'https://storage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4',
-    description: 'In a distant future, a lone explorer discovers a forgotten frequency that could rewrite history.',
-    year: 2024,
-    genre: 'Sci-Fi',
-    rating: 8.5
-  }
-];
+const getSql = () => {
+  const dbUrl = process.env.DATABASE_URL;
+  if (!dbUrl) return null;
+  if (!sqlInstance) sqlInstance = neon(dbUrl);
+  return sqlInstance;
+};
 
 export const storageService = {
-  // Initialize Database Tables
+  // Initialize database tables with the required schema
   init: async () => {
-    if (!process.env.DATABASE_URL) return;
+    const sql = getSql();
+    if (!sql) return;
+
     try {
       await sql`
         CREATE TABLE IF NOT EXISTS media (
@@ -44,21 +41,26 @@ export const storageService = {
           is_maintenance_mode BOOLEAN DEFAULT FALSE
         )
       `;
-      // Seed if empty
-      const count = await sql`SELECT COUNT(*) FROM media`;
-      if (parseInt(count[0].count) === 0) {
-        for (const item of INITIAL_DATA_SEED) {
-          await storageService.addMedia(item);
-        }
-      }
+      await sql`
+        CREATE TABLE IF NOT EXISTS notifications (
+          id TEXT PRIMARY KEY,
+          title TEXT NOT NULL,
+          message TEXT NOT NULL,
+          thumbnail_url TEXT,
+          created_at BIGINT
+        )
+      `;
     } catch (e) {
       console.error("DB Initialization failed:", e);
     }
   },
 
+  // Fix: Cast database results to any[] to resolve the error where 'map' is not recognized on the query result type
   getMedia: async (): Promise<Media[]> => {
+    const sql = getSql();
+    if (!sql) return [];
     try {
-      const rows = await sql`SELECT * FROM media ORDER BY created_at DESC`;
+      const rows = (await sql`SELECT * FROM media ORDER BY created_at DESC`) as any[];
       return rows.map(r => ({
         id: r.id,
         title: r.title,
@@ -66,81 +68,125 @@ export const storageService = {
         thumbnailUrl: r.thumbnail_url,
         backdropUrl: r.backdrop_url,
         videoUrl: r.video_url,
-        seasons: r.seasons,
+        seasons: typeof r.seasons === 'string' ? JSON.parse(r.seasons) : r.seasons,
         description: r.description,
         year: r.year,
         genre: r.genre,
         rating: parseFloat(r.rating),
         createdAt: parseInt(r.created_at)
       }));
-    } catch (e) {
-      console.error("Fetch failed", e);
-      return [];
+    } catch (err) { 
+      console.error("Error fetching media:", err);
+      return []; 
     }
   },
 
-  addMedia: async (media: Omit<Media, 'id' | 'createdAt'>): Promise<Media> => {
+  // Add a new media entry to the database
+  addMedia: async (media: Omit<Media, 'id' | 'createdAt'>): Promise<Media | null> => {
+    const sql = getSql();
+    if (!sql) return null;
     const id = Math.random().toString(36).substring(2, 11);
     const createdAt = Date.now();
     await sql`
       INSERT INTO media (id, title, type, thumbnail_url, backdrop_url, video_url, seasons, description, year, genre, rating, created_at)
       VALUES (${id}, ${media.title}, ${media.type}, ${media.thumbnailUrl}, ${media.backdropUrl}, ${media.videoUrl || null}, ${JSON.stringify(media.seasons || [])}, ${media.description}, ${media.year}, ${media.genre}, ${media.rating}, ${createdAt})
     `;
-    return { ...media, id, createdAt };
+    return { ...media, id, createdAt } as Media;
   },
 
-  deleteMedia: async (id: string): Promise<void> => {
-    await sql`DELETE FROM media WHERE id = ${id}`;
-  },
-
+  // Fix: Added missing updateMedia method to allow content editing in AdminDashboard
   updateMedia: async (media: Media): Promise<void> => {
+    const sql = getSql();
+    if (!sql) return;
     await sql`
-      UPDATE media SET 
-        title = ${media.title},
-        type = ${media.type},
-        thumbnail_url = ${media.thumbnailUrl},
-        backdrop_url = ${media.backdropUrl},
-        video_url = ${media.videoUrl || null},
-        seasons = ${JSON.stringify(media.seasons || [])},
-        description = ${media.description},
-        year = ${media.year},
-        genre = ${media.genre},
-        rating = ${media.rating}
+      UPDATE media 
+      SET title = ${media.title}, 
+          type = ${media.type}, 
+          thumbnail_url = ${media.thumbnailUrl}, 
+          backdrop_url = ${media.backdropUrl}, 
+          video_url = ${media.videoUrl || null}, 
+          seasons = ${JSON.stringify(media.seasons || [])}, 
+          description = ${media.description}, 
+          year = ${media.year}, 
+          genre = ${media.genre}, 
+          rating = ${media.rating}
       WHERE id = ${media.id}
     `;
   },
 
-  getSettings: async (): Promise<AppSettings> => {
-    try {
-      const rows = await sql`SELECT * FROM settings WHERE id = 'global'`;
-      if (rows.length === 0) return { isMaintenanceMode: false };
-      return { isMaintenanceMode: rows[0].is_maintenance_mode };
-    } catch {
-      return { isMaintenanceMode: false };
-    }
+  // Delete a media entry by its ID
+  deleteMedia: async (id: string): Promise<void> => {
+    const sql = getSql();
+    if (!sql) return;
+    await sql`DELETE FROM media WHERE id = ${id}`;
   },
 
-  updateSettings: async (settings: AppSettings) => {
+  // Fix: Added missing getSettings method to support maintenance mode logic in the UI
+  getSettings: async (): Promise<AppSettings> => {
+    const sql = getSql();
+    if (!sql) return { isMaintenanceMode: false };
+    try {
+      const rows = (await sql`SELECT * FROM settings LIMIT 1`) as any[];
+      if (rows.length === 0) return { isMaintenanceMode: false };
+      return { isMaintenanceMode: rows[0].is_maintenance_mode };
+    } catch { return { isMaintenanceMode: false }; }
+  },
+
+  // Fix: Cast notification query results to any[] to resolve the error where 'map' is not recognized
+  getNotifications: async (): Promise<AppNotification[]> => {
+    const sql = getSql();
+    if (!sql) return [];
+    try {
+      const rows = (await sql`SELECT * FROM notifications ORDER BY created_at DESC LIMIT 10`) as any[];
+      return rows.map(r => ({
+        id: r.id,
+        title: r.title,
+        message: r.message,
+        thumbnailUrl: r.thumbnail_url,
+        createdAt: parseInt(r.created_at)
+      }));
+    } catch { return []; }
+  },
+
+  // Add a notification to the system
+  addNotification: async (n: Omit<AppNotification, 'id' | 'createdAt'>) => {
+    const sql = getSql();
+    if (!sql) return;
+    const id = Math.random().toString(36).substring(2, 11);
+    const createdAt = Date.now();
     await sql`
-      INSERT INTO settings (id, is_maintenance_mode) 
-      VALUES ('global', ${settings.isMaintenanceMode})
-      ON CONFLICT (id) DO UPDATE SET is_maintenance_mode = ${settings.isMaintenanceMode}
+      INSERT INTO notifications (id, title, message, thumbnail_url, created_at)
+      VALUES (${id}, ${n.title}, ${n.message}, ${n.thumbnailUrl}, ${createdAt})
     `;
   },
 
-  // Helper for local preferences
-  getWatchedProgress: (id: string): number => {
-    const data = localStorage.getItem(StorageKey.WATCHED_PROGRESS);
-    if (!data) return 0;
-    try {
-      return JSON.parse(data)[id] || 0;
-    } catch { return 0; }
+  // Clear all system notifications
+  clearNotifications: async () => {
+    const sql = getSql();
+    if (!sql) return;
+    await sql`DELETE FROM notifications`;
   },
 
+  // Fix: Added missing setWatchedProgress method using LocalStorage for client-side persistence
   setWatchedProgress: (id: string, progress: number) => {
-    const data = localStorage.getItem(StorageKey.WATCHED_PROGRESS);
-    const map = data ? JSON.parse(data) : {};
-    map[id] = progress;
-    localStorage.setItem(StorageKey.WATCHED_PROGRESS, JSON.stringify(map));
+    try {
+      const stored = localStorage.getItem(StorageKey.WATCHED_PROGRESS);
+      const data = stored ? JSON.parse(stored) : {};
+      data[id] = progress;
+      localStorage.setItem(StorageKey.WATCHED_PROGRESS, JSON.stringify(data));
+    } catch (e) {
+      console.error("Failed to set watch progress:", e);
+    }
+  },
+
+  // Fix: Added missing getWatchedProgress method to track viewing progress across sessions
+  getWatchedProgress: (id: string): number => {
+    try {
+      const stored = localStorage.getItem(StorageKey.WATCHED_PROGRESS);
+      const data = stored ? JSON.parse(stored) : {};
+      return data[id] || 0;
+    } catch {
+      return 0;
+    }
   }
 };

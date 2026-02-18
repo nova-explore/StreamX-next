@@ -3,7 +3,7 @@ import Navbar from '../components/Navbar';
 import DetailsModal from '../components/DetailsModal';
 import { storageService } from '../services/storageService';
 import { Media, StorageKey, AppSettings } from '../types';
-import { Play, Info, ChevronRight, Plus, Check, ShieldAlert } from 'lucide-react';
+import { Play, Info, ChevronRight, Plus, Check, ShieldAlert, Film, RefreshCcw } from 'lucide-react';
 import { useNavigate, Link } from 'react-router-dom';
 
 const HomePage: React.FC = () => {
@@ -20,22 +20,24 @@ const HomePage: React.FC = () => {
 
   const isAdmin = localStorage.getItem('admin_session') === 'true';
 
-  useEffect(() => {
-    const initAndFetch = async () => {
-      setIsLoading(true);
-      await storageService.init();
-      const data = await storageService.getMedia();
-      const sets = await storageService.getSettings();
-      
-      setAllMedia(data);
-      setFilteredMedia(data);
-      setSettings(sets);
-      if (data.length > 0) setFeatured(data[0]);
+  const initAndFetch = async () => {
+    setIsLoading(true);
+    await storageService.init();
+    const data = await storageService.getMedia();
+    const sets = await storageService.getSettings();
+    
+    setAllMedia(data);
+    setFilteredMedia(data);
+    setSettings(sets);
+    if (data.length > 0) setFeatured(data[0]);
+    else setFeatured(null);
 
-      const savedList = localStorage.getItem(StorageKey.MY_LIST);
-      if (savedList) setMyListIds(JSON.parse(savedList));
-      setIsLoading(false);
-    };
+    const savedList = localStorage.getItem(StorageKey.MY_LIST);
+    if (savedList) setMyListIds(JSON.parse(savedList));
+    setIsLoading(false);
+  };
+
+  useEffect(() => {
     initAndFetch();
   }, []);
 
@@ -125,7 +127,7 @@ const HomePage: React.FC = () => {
     );
   };
 
-  if (isLoading) return null; // Let the global loader handle this
+  if (isLoading) return null; // Let the global loader handle initial boot
 
   if (settings.isMaintenanceMode && !isAdmin) {
     return (
@@ -136,6 +138,33 @@ const HomePage: React.FC = () => {
             <p className="text-gray-400 font-medium leading-relaxed">Platform access is currently restricted for scheduled synchronization. We will be back shortly.</p>
          </div>
          <Link to="/login" className="text-brand text-[10px] font-black uppercase tracking-widest hover:underline decoration-brand/50 underline-offset-8">Administrative Gateway</Link>
+      </div>
+    );
+  }
+
+  // "No movies found" sleek empty state
+  if (allMedia.length === 0 && !isLoading) {
+    return (
+      <div className="min-h-screen bg-[#050505] text-white">
+        <Navbar isAdmin={isAdmin} onFilterChange={handleFilterChange} onSearch={handleSearch} activeFilter={activeFilter} />
+        <div className="flex flex-col items-center justify-center min-h-[80vh] px-6 text-center space-y-8">
+           <div className="relative">
+              <Film className="w-32 h-32 text-white/5" />
+              <div className="absolute inset-0 bg-brand/10 blur-3xl rounded-full animate-pulse" />
+           </div>
+           <div className="space-y-4">
+              <h1 className="text-3xl md:text-5xl font-black italic uppercase tracking-tighter">No movies found yet</h1>
+              <p className="text-gray-500 font-medium max-w-md mx-auto leading-relaxed uppercase text-[10px] tracking-widest">The database is currently clear. Please refresh or check back later after content has been uploaded via the Admin Gateway.</p>
+           </div>
+           <button 
+             onClick={initAndFetch}
+             className="flex items-center space-x-3 bg-white text-black px-8 py-4 rounded-2xl hover:bg-brand hover:text-white transition-all font-black shadow-2xl active:scale-95"
+           >
+             <RefreshCcw className="w-5 h-5" />
+             <span>REFRESH CATALOG</span>
+           </button>
+           <Link to="/login" className="text-brand text-[10px] font-black uppercase tracking-widest hover:underline decoration-brand/50 underline-offset-8">Admin Access</Link>
+        </div>
       </div>
     );
   }

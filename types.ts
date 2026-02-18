@@ -1,4 +1,3 @@
-
 export type ContentType = 'movie' | 'series';
 
 export interface Episode {
@@ -21,9 +20,9 @@ export interface Media {
   title: string;
   type: ContentType;
   thumbnailUrl: string;
-  backdropUrl?: string; // Cinematic wide background
-  videoUrl?: string; // Used for movies
-  seasons?: Season[]; // Used for series
+  backdropUrl?: string;
+  videoUrl?: string;
+  seasons?: Season[];
   description: string;
   year: number;
   genre: string;
@@ -31,10 +30,12 @@ export interface Media {
   createdAt: number;
 }
 
-export interface User {
+export interface AppNotification {
   id: string;
-  role: 'admin' | 'user';
-  username: string;
+  title: string;
+  message: string;
+  thumbnailUrl?: string;
+  createdAt: number;
 }
 
 export interface AppSettings {

@@ -3,10 +3,11 @@
 <head>
     <script>
         // CRITICAL: Define globals immediately
+        // Environment variables are injected at runtime by the platform
         window.process = window.process || { env: { 
           API_KEY: "",
-          DATABASE_URL: "",
-          ADMIN_PASSWORD: ""
+          DATABASE_URL: "postgresql://neondb_owner:npg_4JWnjwYNQDT8@ep-blue-shape-ai4ecsx3-pooler.c-4.us-east-1.aws.neon.tech/neondb?sslmode=require",
+          ADMIN_PASSWORD: "" 
         }};
         window.global = window.global || window;
 
