@@ -2,24 +2,24 @@
 <html lang="en">
 <head>
     <script>
-        // CRITICAL: Define globals safely. 
-        // The platform injects environment variables into window.process.env.
+        // Initialize globals safely. 
+        // Platform environment variables (Vercel, etc.) are injected into window.process.env.
         window.process = window.process || { env: {} };
         window.process.env = window.process.env || {};
-        
         window.global = window.global || window;
 
+        // Global error tracking for cloud-based monitoring
         window.addEventListener('error', function(e) {
             const loaderText = document.getElementById('loader-text');
             if (loaderText) {
-                loaderText.innerHTML = '<span style="color:#ff4444; font-weight:900;">BOOT ERROR</span><br/><small style="color:#666; font-size:9px; text-transform:none; letter-spacing:0;">' + e.message + '</small>';
+                loaderText.innerHTML = '<span style="color:#ff4444; font-weight:900;">SYSTEM HALT</span><br/><small style="color:#666; font-size:9px; text-transform:none; letter-spacing:0;">' + e.message + '</small>';
                 loaderText.style.color = "#ff4444";
             }
         });
     </script>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>StreamX | Your Ultimate Movie Hub</title>
+    <title>StreamX | Premium Cloud Streaming</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script>
         tailwind.config = {
@@ -50,12 +50,6 @@
         ::-webkit-scrollbar-thumb { background: #333; border-radius: 10px; }
         ::-webkit-scrollbar-thumb:hover { background: #29A829; }
         
-        @keyframes breathe {
-            0%, 100% { opacity: 0.4; transform: scale(1); }
-            50% { opacity: 0.6; transform: scale(1.05); }
-        }
-        .animate-breathe { animation: breathe 8s ease-in-out infinite; }
-
         #app-loader {
             position: fixed; inset: 0; background: #000;
             display: flex; flex-direction: column; align-items: center; justify-content: center;
@@ -88,7 +82,7 @@
 <body>
     <div id="app-loader">
         <div class="spinner"></div>
-        <div id="loader-text" style="color: #444; font-size: 10px; font-weight: 900; letter-spacing: 0.2em; text-transform: uppercase; font-style: italic; text-align: center;">Initializing StreamX Engine</div>
+        <div id="loader-text" style="color: #444; font-size: 10px; font-weight: 900; letter-spacing: 0.2em; text-transform: uppercase; font-style: italic; text-align: center;">Authenticating Cloud Resources</div>
     </div>
     <div id="root"></div>
 <script type="module" src="/index.tsx"></script>

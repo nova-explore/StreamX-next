@@ -1,6 +1,7 @@
 import React from 'react';
 import { createRoot } from 'react-dom/client';
 import App from './App';
+import { ShieldAlert, Database, Key, Lock } from 'lucide-react';
 
 const container = document.getElementById('root');
 
@@ -14,55 +15,70 @@ const hideLoader = () => {
   }
 };
 
-const displayError = (err: any, title = "Mounting Error") => {
-  const loaderText = document.getElementById('loader-text');
-  if (loaderText) {
-    loaderText.innerHTML = `
-      <span style="color: #ff4444; font-size: 14px;">${title}</span><br/>
-      <small style="text-transform: none; color: #666; display: block; margin-top: 10px; font-weight: normal; letter-spacing: normal;">
-        ${err instanceof Error ? err.message : String(err)}
-      </small>
-      <div style="margin-top: 20px; display: flex; gap: 10px; justify-content: center;">
-        <button onclick="location.reload()" style="background: #222; border: 1px solid #333; color: #29A829; padding: 8px 20px; border-radius: 8px; cursor: pointer; font-weight:bold;">Try Again</button>
+const MissingConfigScreen = ({ missing }: { missing: string[] }) => (
+  <div className="min-h-screen bg-[#050505] flex flex-col items-center justify-center p-8 text-center space-y-10">
+    <div className="relative">
+      <div className="w-24 h-24 bg-red-500/10 rounded-full flex items-center justify-center border border-red-500/20">
+        <ShieldAlert className="w-10 h-10 text-red-500" />
       </div>
-    `;
-    const spinner = document.querySelector('.spinner') as HTMLElement;
-    if (spinner) spinner.style.borderColor = 'rgba(255, 68, 68, 0.2)';
-  }
-};
+      <div className="absolute inset-0 bg-red-500/5 blur-3xl rounded-full" />
+    </div>
+    <div className="space-y-4 max-w-lg">
+      <h1 className="text-3xl font-black italic uppercase tracking-tighter">Environment Missing</h1>
+      <p className="text-gray-500 text-sm font-medium leading-relaxed">The following cloud environment variables must be configured in your Vercel/Platform dashboard to proceed:</p>
+    </div>
+    <div className="flex flex-col gap-3 w-full max-w-xs">
+      {missing.includes('DATABASE_URL') && (
+        <div className="flex items-center space-x-3 p-4 bg-white/5 border border-white/10 rounded-2xl">
+          <Database className="w-4 h-4 text-red-400" />
+          <span className="text-[10px] font-black uppercase tracking-widest text-red-400">DATABASE_URL</span>
+        </div>
+      )}
+      {missing.includes('API_KEY') && (
+        <div className="flex items-center space-x-3 p-4 bg-white/5 border border-white/10 rounded-2xl">
+          <Key className="w-4 h-4 text-red-400" />
+          <span className="text-[10px] font-black uppercase tracking-widest text-red-400">API_KEY (Gemini)</span>
+        </div>
+      )}
+      {missing.includes('ADMIN_PASSWORD') && (
+        <div className="flex items-center space-x-3 p-4 bg-white/5 border border-white/10 rounded-2xl">
+          <Lock className="w-4 h-4 text-red-400" />
+          <span className="text-[10px] font-black uppercase tracking-widest text-red-400">ADMIN_PASSWORD</span>
+        </div>
+      )}
+    </div>
+    <button 
+      onClick={() => window.location.reload()}
+      className="text-white bg-white/10 px-8 py-3 rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-white/20 transition-all border border-white/10"
+    >
+      Retry Connection
+    </button>
+  </div>
+);
 
 if (container) {
-  try {
-    // Detect missing database configuration before React boot
-    if (!process.env.DATABASE_URL) {
-      console.warn("CRITICAL: DATABASE_URL environment variable is missing.");
-      // We don't crash the whole app here, just warn. 
-      // The storageService will handle the empty state gracefully.
+  const missingVars = [];
+  if (!process.env.DATABASE_URL) missingVars.push('DATABASE_URL');
+  if (!process.env.API_KEY) missingVars.push('API_KEY');
+  if (!process.env.ADMIN_PASSWORD) missingVars.push('ADMIN_PASSWORD');
+
+  const root = createRoot(container);
+  
+  if (missingVars.length > 0) {
+    root.render(<MissingConfigScreen missing={missingVars} />);
+    hideLoader();
+  } else {
+    try {
+      (window as any).React = React;
+      root.render(
+        <React.StrictMode>
+          <App />
+        </React.StrictMode>
+      );
+      window.addEventListener('load', () => setTimeout(hideLoader, 500));
+      setTimeout(hideLoader, 3000);
+    } catch (error) {
+      console.error("Mount Failure:", error);
     }
-
-    // Expose React globally to help some ESM modules find it
-    (window as any).React = React;
-
-    const root = createRoot(container);
-    
-    root.render(
-      <React.StrictMode>
-        <App />
-      </React.StrictMode>
-    );
-
-    // Give the browser time to finish the first paint before hiding the loading overlay
-    window.addEventListener('load', () => {
-        setTimeout(hideLoader, 500);
-    });
-
-    // Failsafe for hideLoader
-    setTimeout(hideLoader, 2000);
-
-  } catch (error) {
-    console.error("Critical React Mount Failure:", error);
-    displayError(error);
   }
-} else {
-  console.error("Critical Failure: Root element not found.");
 }
