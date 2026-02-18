@@ -121,18 +121,48 @@ const DetailsModal: React.FC<DetailsModalProps> = ({ item, onClose, isInList, on
                 </div>
               </div>
               <div className="grid gap-4">
-                {selectedSeason?.episodes.map((ep, idx) => (
-                  <div key={ep.id} onClick={() => navigate(`/watch/${item.id}`)} className="group flex items-center space-x-6 p-6 bg-white/[0.01] hover:bg-white/[0.03] border border-white/5 rounded-3xl transition-all cursor-pointer">
-                    <div className="text-3xl font-black italic text-white/10 group-hover:text-brand w-12 text-center">{idx + 1}</div>
-                    <div className="flex-1">
-                      <h4 className="font-black uppercase tracking-widest text-gray-400 group-hover:text-white transition-colors">{ep.title}</h4>
-                      <div className="flex items-center space-x-3 mt-1 text-[9px] font-black text-gray-600 uppercase tracking-widest">
-                        <Clock className="w-3 h-3" /> <span>{ep.duration || '45m'}</span>
-                        {getEpisodeProgress(ep.id) > 0 && <span className="text-brand">Watched</span>}
+                {selectedSeason?.episodes.map((ep, idx) => {
+                  const progress = getEpisodeProgress(ep.id);
+                  const isWatched = progress >= 100;
+
+                  return (
+                    <div 
+                      key={ep.id} 
+                      onClick={() => navigate(`/watch/${item.id}`)} 
+                      className="group relative flex items-center space-x-6 p-6 bg-white/[0.01] hover:bg-white/[0.03] border border-white/5 rounded-3xl transition-all cursor-pointer overflow-hidden"
+                    >
+                      <div className="text-3xl font-black italic text-white/10 group-hover:text-brand w-12 text-center transition-colors duration-500">
+                        {idx + 1}
                       </div>
+                      <div className="flex-1">
+                        <div className="flex items-center space-x-2">
+                          <h4 className="font-black uppercase tracking-widest text-gray-400 group-hover:text-white transition-colors">
+                            {ep.title}
+                          </h4>
+                          {isWatched && <CheckCircle2 className="w-3 h-3 text-brand" />}
+                        </div>
+                        <div className="flex items-center space-x-3 mt-1 text-[9px] font-black text-gray-600 uppercase tracking-widest">
+                          <Clock className="w-3 h-3" /> <span>{ep.duration || '45m'}</span>
+                          {isWatched ? (
+                            <span className="text-brand">Completed</span>
+                          ) : progress > 0 ? (
+                            <span className="text-brand-light">In Progress</span>
+                          ) : null}
+                        </div>
+                      </div>
+
+                      {/* Subtle Progress Bar */}
+                      {progress > 0 && (
+                        <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-white/5">
+                          <div 
+                            className="h-full bg-brand shadow-[0_0_10px_rgba(41,168,41,0.5)] transition-all duration-1000"
+                            style={{ width: `${progress}%` }}
+                          />
+                        </div>
+                      )}
                     </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             </div>
           )}
