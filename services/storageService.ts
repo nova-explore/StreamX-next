@@ -3,79 +3,25 @@ import { Media, AppSettings, AppNotification } from '../types';
 
 let clientInstance: any = null;
 
-const DEMO_MEDIA: Media[] = [
-  {
-    id: 'demo-movie-1',
-    title: 'The Midnight Sky',
-    type: 'movie',
-    thumbnailUrl: 'https://images.unsplash.com/photo-1536440136628-849c177e76a1?auto=format&fit=crop&q=80&w=1000',
-    backdropUrl: 'https://images.unsplash.com/photo-1446776811953-b23d57bd21aa?auto=format&fit=crop&q=80&w=1920',
-    videoUrl: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4',
-    description: 'A lonely scientist in the Arctic races to stop a group of astronauts from returning home to a mysterious global catastrophe.',
-    year: 2024,
-    genre: 'Sci-Fi, Drama',
-    rating: 8.4,
-    createdAt: Date.now() - 10000
-  },
-  {
-    id: 'demo-movie-2',
-    title: 'Neon Odyssey',
-    type: 'movie',
-    thumbnailUrl: 'https://images.unsplash.com/photo-1578301978693-85fa9c0320b9?auto=format&fit=crop&q=80&w=1000',
-    backdropUrl: 'https://images.unsplash.com/photo-1514539079130-25950c84af65?auto=format&fit=crop&q=80&w=1920',
-    videoUrl: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ElephantsDream.mp4',
-    description: 'In a world where memories can be traded like currency, a memory thief discovers a secret that could collapse the global economy.',
-    year: 2023,
-    genre: 'Cyberpunk, Thriller',
-    rating: 8.9,
-    createdAt: Date.now() - 15000
-  },
-  {
-    id: 'demo-series-1',
-    title: 'Horizon Alpha',
-    type: 'series',
-    thumbnailUrl: 'https://images.unsplash.com/photo-1614850523296-e8c041de83a4?auto=format&fit=crop&q=80&w=1000',
-    backdropUrl: 'https://images.unsplash.com/photo-1605810230434-7631ac76ec81?auto=format&fit=crop&q=80&w=1920',
-    description: 'The first colony on Mars faces an internal crisis when a mysterious illness begins affecting the artificial intelligence running the life-support systems.',
-    year: 2023,
-    genre: 'Sci-Fi, Mystery',
-    rating: 9.1,
-    createdAt: Date.now() - 20000,
-    seasons: [
-      {
-        id: 's1',
-        seasonNumber: 1,
-        episodes: [
-          {
-            id: 'e1',
-            title: 'Descent',
-            videoUrl: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/TearsOfSteel.mp4',
-            order: 1,
-            duration: '42m',
-            description: 'The crew of Horizon Alpha makes their final approach to the red planet.'
-          },
-          {
-            id: 'e2',
-            title: 'Static',
-            videoUrl: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/Sintel.mp4',
-            order: 2,
-            duration: '38m',
-            description: 'Communication with Earth is lost, and the colony must decide who to trust.'
-          }
-        ]
-      }
-    ]
-  }
-];
-
+/**
+ * Production Database Client Initializer
+ * Securely pulls credentials from the environment.
+ */
 const getClient = () => {
   const url = process.env.TURSO_DATABASE_URL;
   const authToken = process.env.TURSO_AUTH_TOKEN || "";
-  if (!url) return null;
+  
+  if (!url) {
+    // In production, we do not log the missing URL to the console to prevent leak of infrastructure details,
+    // but we return null so the app knows it's in a disconnected state.
+    return null;
+  }
+  
   if (!clientInstance) {
     try {
       clientInstance = createClient({ url, authToken });
     } catch (e) {
+      console.error("Database Connection Failure: Check TURSO_DATABASE_URL and AUTH_TOKEN.");
       return null;
     }
   }
@@ -83,26 +29,63 @@ const getClient = () => {
 };
 
 export const storageService = {
-  isProduction: () => !!process.env.TURSO_DATABASE_URL && !!process.env.TURSO_AUTH_TOKEN,
+  /**
+   * Status check for the cloud layer.
+   */
+  isProduction: () => !!process.env.TURSO_DATABASE_URL,
   
+  /**
+   * Initializes the database schema on boot.
+   */
   init: async () => {
     const client = getClient();
     if (!client) return;
     try {
-      await client.execute(`CREATE TABLE IF NOT EXISTS media (id TEXT PRIMARY KEY, title TEXT NOT NULL, type TEXT NOT NULL, thumbnail_url TEXT, backdrop_url TEXT, video_url TEXT, seasons TEXT, description TEXT, year INTEGER, genre TEXT, rating REAL, created_at INTEGER)`);
-      await client.execute(`CREATE TABLE IF NOT EXISTS settings (id TEXT PRIMARY KEY, is_maintenance_mode INTEGER DEFAULT 0)`);
-      await client.execute(`CREATE TABLE IF NOT EXISTS notifications (id TEXT PRIMARY KEY, title TEXT NOT NULL, message TEXT NOT NULL, thumbnail_url TEXT, created_at INTEGER)`);
+      await client.execute(`
+        CREATE TABLE IF NOT EXISTS media (
+          id TEXT PRIMARY KEY, 
+          title TEXT NOT NULL, 
+          type TEXT NOT NULL, 
+          thumbnail_url TEXT, 
+          backdrop_url TEXT, 
+          video_url TEXT, 
+          seasons TEXT, 
+          description TEXT, 
+          year INTEGER, 
+          genre TEXT, 
+          rating REAL, 
+          created_at INTEGER
+        )
+      `);
+      await client.execute(`
+        CREATE TABLE IF NOT EXISTS settings (
+          id TEXT PRIMARY KEY, 
+          is_maintenance_mode INTEGER DEFAULT 0
+        )
+      `);
+      await client.execute(`
+        CREATE TABLE IF NOT EXISTS notifications (
+          id TEXT PRIMARY KEY, 
+          title TEXT NOT NULL, 
+          message TEXT NOT NULL, 
+          thumbnail_url TEXT, 
+          created_at INTEGER
+        )
+      `);
     } catch (e) {
-      console.warn("Storage Initialization: Database layer bypassed.");
+      console.error("Schema Initialization Failure:", e);
     }
   },
 
+  /**
+   * Fetches all media entries from the Turso cloud.
+   * Returns an empty array if the database is disconnected or empty.
+   */
   getMedia: async (): Promise<Media[]> => {
     const client = getClient();
-    if (!client) return DEMO_MEDIA;
+    if (!client) return [];
     try {
       const result = await client.execute("SELECT * FROM media ORDER BY created_at DESC");
-      if (result.rows.length === 0) return DEMO_MEDIA;
       return result.rows.map((r: any) => ({
         id: r.id,
         title: r.title,
@@ -118,7 +101,8 @@ export const storageService = {
         createdAt: Number(r.created_at || "0")
       }));
     } catch (err) { 
-      return DEMO_MEDIA; 
+      console.error("Fetch Media Error:", err);
+      return []; 
     }
   },
 
@@ -134,6 +118,7 @@ export const storageService = {
       });
       return { ...media, id, createdAt } as Media;
     } catch (e) {
+      console.error("Insert Media Error:", e);
       return null;
     }
   },
@@ -147,7 +132,7 @@ export const storageService = {
         args: [media.title, media.type, media.thumbnailUrl, media.backdropUrl || null, media.videoUrl || null, JSON.stringify(media.seasons || []), media.description, media.year, media.genre, media.rating, media.id]
       });
     } catch (e) {
-      console.error("Update failed", e);
+      console.error("Update Media Error:", e);
     }
   },
 
@@ -157,7 +142,7 @@ export const storageService = {
     try {
       await client.execute({ sql: "DELETE FROM media WHERE id = ?", args: [id] });
     } catch (e) {
-      console.error("Delete failed", e);
+      console.error("Delete Media Error:", e);
     }
   },
 
@@ -165,7 +150,7 @@ export const storageService = {
     const client = getClient();
     if (!client) return { isMaintenanceMode: false };
     try {
-      const result = await client.execute("SELECT * FROM settings LIMIT 1");
+      const result = await client.execute("SELECT * FROM settings WHERE id = 'global' LIMIT 1");
       if (result.rows.length === 0) return { isMaintenanceMode: false };
       return { isMaintenanceMode: result.rows[0].is_maintenance_mode === 1 };
     } catch { return { isMaintenanceMode: false }; }
@@ -180,7 +165,7 @@ export const storageService = {
         args: [enabled ? 1 : 0]
       });
     } catch (e) {
-      console.error("Settings update failed", e);
+      console.error("Update Settings Error:", e);
     }
   },
 
@@ -210,7 +195,7 @@ export const storageService = {
         args: [id, n.title, n.message, n.thumbnailUrl || null, createdAt]
       });
     } catch (e) {
-      console.error("Notification failed", e);
+      console.error("Insert Notification Error:", e);
     }
   },
 
@@ -220,7 +205,7 @@ export const storageService = {
     try {
       await client.execute("DELETE FROM notifications");
     } catch (e) {
-      console.error("Clear notifications failed", e);
+      console.error("Clear Notifications Error:", e);
     }
   },
 
