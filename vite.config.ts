@@ -12,7 +12,10 @@ export default defineConfig(({ mode }) => {
       plugins: [react()],
       define: {
         'process.env.API_KEY': JSON.stringify(env.GEMINI_API_KEY),
-        'process.env.GEMINI_API_KEY': JSON.stringify(env.GEMINI_API_KEY)
+        'process.env.GEMINI_API_KEY': JSON.stringify(env.GEMINI_API_KEY),
+        'process.env.ADMIN_PASSWORD': JSON.stringify(env.ADMIN_PASSWORD),
+        'process.env.TURSO_DATABASE_URL': JSON.stringify(env.TURSO_DATABASE_URL),
+        'process.env.TURSO_AUTH_TOKEN': JSON.stringify(env.TURSO_AUTH_TOKEN),
       },
       resolve: {
         alias: {
