@@ -1,14 +1,18 @@
+
 import { neon } from '@neondatabase/serverless';
 import { Media, StorageKey, AppSettings, AppNotification } from '../types';
 
 let sqlInstance: any = null;
 
 const getSql = () => {
-  const dbUrl = process.env.DATABASE_URL;
+  // Support both standard DATABASE_URL and Vercel's automatic POSTGRES_URL
+  const dbUrl = process.env.DATABASE_URL || process.env.POSTGRES_URL;
+  
   if (!dbUrl || dbUrl === "") {
-    console.error("Cloud Error: DATABASE_URL is undefined.");
+    console.error("Cloud Error: No database connection URL found in environment (Checked DATABASE_URL and POSTGRES_URL).");
     return null;
   }
+  
   if (!sqlInstance) {
     try {
       sqlInstance = neon(dbUrl);
@@ -93,6 +97,7 @@ export const storageService = {
     const id = Math.random().toString(36).substring(2, 11);
     const createdAt = Date.now();
     try {
+      // Fix: Use camelCase property names from the media object to match Media type definition in types.ts
       await sql`
         INSERT INTO media (id, title, type, thumbnail_url, backdrop_url, video_url, seasons, description, year, genre, rating, created_at)
         VALUES (${id}, ${media.title}, ${media.type}, ${media.thumbnailUrl}, ${media.backdropUrl}, ${media.videoUrl || null}, ${JSON.stringify(media.seasons || [])}, ${media.description}, ${media.year}, ${media.genre}, ${media.rating}, ${createdAt})
@@ -168,6 +173,7 @@ export const storageService = {
     const id = Math.random().toString(36).substring(2, 11);
     const createdAt = Date.now();
     try {
+      // Fix: Use camelCase property name from the notification object to match AppNotification type definition in types.ts
       await sql`
         INSERT INTO notifications (id, title, message, thumbnail_url, created_at)
         VALUES (${id}, ${n.title}, ${n.message}, ${n.thumbnailUrl}, ${createdAt})

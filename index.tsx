@@ -31,7 +31,7 @@ const MissingConfigScreen = ({ missing }: { missing: string[] }) => (
       {missing.includes('DATABASE_URL') && (
         <div className="flex items-center space-x-3 p-4 bg-white/5 border border-white/10 rounded-2xl">
           <Database className="w-4 h-4 text-red-400" />
-          <span className="text-[10px] font-black uppercase tracking-widest text-red-400">DATABASE_URL</span>
+          <span className="text-[10px] font-black uppercase tracking-widest text-red-400">DATABASE_URL / POSTGRES_URL</span>
         </div>
       )}
       {missing.includes('API_KEY') && (
@@ -58,7 +58,11 @@ const MissingConfigScreen = ({ missing }: { missing: string[] }) => (
 
 if (container) {
   const missingVars = [];
-  if (!process.env.DATABASE_URL) missingVars.push('DATABASE_URL');
+  
+  // Vercel automatically creates POSTGRES_URL for Neon/Vercel Postgres
+  const hasDb = process.env.DATABASE_URL || process.env.POSTGRES_URL;
+  
+  if (!hasDb) missingVars.push('DATABASE_URL');
   if (!process.env.API_KEY) missingVars.push('API_KEY');
   if (!process.env.ADMIN_PASSWORD) missingVars.push('ADMIN_PASSWORD');
 

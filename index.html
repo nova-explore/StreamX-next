@@ -2,10 +2,17 @@
 <html lang="en">
 <head>
     <script>
-        // Initialize globals safely. 
-        // Platform environment variables (Vercel, etc.) are injected into window.process.env.
-        window.process = window.process || { env: {} };
-        window.process.env = window.process.env || {};
+        /**
+         * CRITICAL: Initialize process.env safely.
+         * We must not overwrite window.process if the platform (Vercel/Cloud) 
+         * has already injected environment variables into it.
+         */
+        if (typeof window.process === 'undefined') {
+            window.process = { env: {} };
+        } else if (typeof window.process.env === 'undefined') {
+            window.process.env = {};
+        }
+        
         window.global = window.global || window;
 
         // Global error tracking for cloud-based monitoring
@@ -82,7 +89,7 @@
 <body>
     <div id="app-loader">
         <div class="spinner"></div>
-        <div id="loader-text" style="color: #444; font-size: 10px; font-weight: 900; letter-spacing: 0.2em; text-transform: uppercase; font-style: italic; text-align: center;">Authenticating Cloud Resources</div>
+        <div id="loader-text" style="color: #444; font-size: 10px; font-weight: 900; letter-spacing: 0.2em; text-transform: uppercase; font-style: italic; text-align: center;">Syncing Cloud Environment</div>
     </div>
     <div id="root"></div>
 <script type="module" src="/index.tsx"></script>
