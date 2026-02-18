@@ -12,7 +12,7 @@ const Login: React.FC = () => {
     e.preventDefault();
     
     // Explicitly take the password from the environment variable
-    const envPass = process.env.ADMIN_PASSWORD ;
+    const envPass = process.env.ADMIN_PASSWORD;
     
     // Security check: if the env var is not set or is empty, we block login and warn the dev
     if (!envPass || envPass.trim() === "") {
