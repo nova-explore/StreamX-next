@@ -11,12 +11,11 @@ const Login: React.FC = () => {
   const handleLogin = (e: React.FormEvent) => {
     e.preventDefault();
     
-    // Explicitly take the password from the environment variable
-    const envPass = process.env.ADMIN_PASSWORD;
+    // Explicitly check both variable names for flexibility
+    const envPass = process.env.ADMIN_PASSWORD || process.env.ADMIN_PASS;
     
-    // Security check: if the env var is not set or is empty, we block login and warn the dev
     if (!envPass || envPass.trim() === "") {
-      setError('CRITICAL SECURITY ERROR: ADMIN_PASSWORD is not configured in the environment.');
+      setError('CRITICAL SECURITY ERROR: Administrative key is not synchronized.');
       setIsConfigError(true);
       return;
     }
@@ -101,7 +100,7 @@ const Login: React.FC = () => {
 
         <div className="mt-12 pt-8 border-t border-white/5 text-center">
           <p className="text-[9px] text-gray-700 font-bold uppercase tracking-widest leading-relaxed">
-            Unauthorized access attempts are logged and monitored. <br/> Platform Protected by StreamX Security Core.
+            Unauthorized access attempts are logged and monitored. <br/> Platform Protected by Turso Security Core.
           </p>
         </div>
       </div>

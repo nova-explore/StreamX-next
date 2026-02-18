@@ -3,24 +3,17 @@
 <head>
     <script>
         /**
-         * CRITICAL: Initialize process.env safely.
-         * We must not overwrite window.process if the platform (Vercel/Cloud) 
-         * has already injected environment variables into it.
+         * SECURE ENVIRONMENT SHIM
+         * Standardizes the process.env object for the browser environment.
+         * Sensitive credentials are read directly from the environment at runtime.
          */
-        if (typeof window.process === 'undefined') {
-            window.process = { env: {} };
-        } else if (typeof window.process.env === 'undefined') {
-            window.process.env = {};
-        }
-        
+        window.process = window.process || { env: {} };
         window.global = window.global || window;
 
-        // Global error tracking for cloud-based monitoring
         window.addEventListener('error', function(e) {
             const loaderText = document.getElementById('loader-text');
             if (loaderText) {
-                loaderText.innerHTML = '<span style="color:#ff4444; font-weight:900;">SYSTEM HALT</span><br/><small style="color:#666; font-size:9px; text-transform:none; letter-spacing:0;">' + e.message + '</small>';
-                loaderText.style.color = "#ff4444";
+                loaderText.innerHTML = '<span style="color:#ff4444; font-weight:900;">SECURE BOOT ERROR</span><br/><small style="color:#666; font-size:9px; text-transform:none;">' + e.message + '</small>';
             }
         });
     </script>
@@ -78,9 +71,10 @@
     "react-router-dom": "https://esm.sh/react-router-dom@7.1.3?deps=react@19.0.0,react-dom@19.0.0",
     "lucide-react": "https://esm.sh/lucide-react@0.474.0?deps=react@19.0.0",
     "@google/genai": "https://esm.sh/@google/genai@1.41.0",
-    "@neondatabase/serverless": "https://esm.sh/@neondatabase/serverless@0.10.4",
+    "@libsql/client/web": "https://esm.sh/@libsql/client@0.14.0/web",
     "react-dom/": "https://esm.sh/react-dom@^19.2.4/",
-    "react/": "https://esm.sh/react@^19.2.4/"
+    "react/": "https://esm.sh/react@^19.2.4/",
+    "@libsql/client/": "https://esm.sh/@libsql/client@^0.17.0/"
   }
 }
 </script>
@@ -89,7 +83,7 @@
 <body>
     <div id="app-loader">
         <div class="spinner"></div>
-        <div id="loader-text" style="color: #444; font-size: 10px; font-weight: 900; letter-spacing: 0.2em; text-transform: uppercase; font-style: italic; text-align: center;">Syncing Cloud Environment</div>
+        <div id="loader-text" style="color: #444; font-size: 10px; font-weight: 900; letter-spacing: 0.2em; text-transform: uppercase; font-style: italic; text-align: center;">Verifying Secure Environment</div>
     </div>
     <div id="root"></div>
 <script type="module" src="/index.tsx"></script>
