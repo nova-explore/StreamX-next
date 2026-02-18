@@ -25,25 +25,31 @@ const WatchPage: React.FC = () => {
   const [isSeasonSelectorOpen, setIsSeasonSelectorOpen] = useState(false);
   const navigate = useNavigate();
 
+  // Fix: storageService.getMedia is async and must be awaited inside an async function within useEffect.
+  // Added await storageService.init() to ensure database connectivity for deep-linked entries.
   useEffect(() => {
-    if (id) {
-      const data = storageService.getMedia();
-      const found = data.find(m => m.id === id);
-      if (found) {
-        setItem(found);
-        if (found.type === 'series' && found.seasons?.length) {
-          setCurrentSeason(found.seasons[0]);
-          if (found.seasons[0].episodes?.length) {
-            setCurrentEpisode(found.seasons[0].episodes[0]);
+    const loadItem = async () => {
+      if (id) {
+        await storageService.init();
+        const data = await storageService.getMedia();
+        const found = data.find(m => m.id === id);
+        if (found) {
+          setItem(found);
+          if (found.type === 'series' && found.seasons?.length) {
+            setCurrentSeason(found.seasons[0]);
+            if (found.seasons[0].episodes?.length) {
+              setCurrentEpisode(found.seasons[0].episodes[0]);
+            }
+          } else if (found.type === 'movie') {
+            // Track movie progress
+            storageService.setWatchedProgress(found.id, 100);
           }
-        } else if (found.type === 'movie') {
-          // Track movie progress
-          storageService.setWatchedProgress(found.id, 100);
+        } else {
+          navigate('/');
         }
-      } else {
-        navigate('/');
       }
-    }
+    };
+    loadItem();
   }, [id, navigate]);
 
   // Mark episode as watched when it changes

@@ -2,9 +2,21 @@
 <html lang="en">
 <head>
     <script>
-        // CRITICAL: Define globals at the absolute earliest possible moment
-        window.process = window.process || { env: { API_KEY: "" } };
+        // CRITICAL: Define globals immediately
+        window.process = window.process || { env: { 
+          API_KEY: "",
+          DATABASE_URL: "",
+          ADMIN_PASSWORD: ""
+        }};
         window.global = window.global || window;
+
+        window.addEventListener('error', function(e) {
+            const loaderText = document.getElementById('loader-text');
+            if (loaderText) {
+                loaderText.innerHTML = '<span style="color:#ff4444; font-weight:900;">BOOT ERROR</span><br/><small style="color:#666; font-size:9px; text-transform:none; letter-spacing:0;">' + e.message + '</small>';
+                loaderText.style.color = "#ff4444";
+            }
+        });
     </script>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -34,49 +46,26 @@
             margin: 0;
             overflow-x: hidden;
         }
-        /* Custom scrollbar for StreamX Brand Green UI */
-        ::-webkit-scrollbar {
-            width: 8px;
-            height: 8px;
-        }
-        ::-webkit-scrollbar-track {
-            background: #141414;
-        }
-        ::-webkit-scrollbar-thumb {
-            background: #333;
-            border-radius: 10px;
-        }
-        ::-webkit-scrollbar-thumb:hover {
-            background: #29A829;
-        }
+        ::-webkit-scrollbar { width: 8px; height: 8px; }
+        ::-webkit-scrollbar-track { background: #141414; }
+        ::-webkit-scrollbar-thumb { background: #333; border-radius: 10px; }
+        ::-webkit-scrollbar-thumb:hover { background: #29A829; }
         
         @keyframes breathe {
             0%, 100% { opacity: 0.4; transform: scale(1); }
             50% { opacity: 0.6; transform: scale(1.05); }
         }
-        .animate-breathe {
-            animation: breathe 8s ease-in-out infinite;
-        }
+        .animate-breathe { animation: breathe 8s ease-in-out infinite; }
 
         #app-loader {
-            position: fixed;
-            inset: 0;
-            background: #000;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            justify-content: center;
-            z-index: 9999;
-            transition: opacity 0.5s ease;
+            position: fixed; inset: 0; background: #000;
+            display: flex; flex-direction: column; align-items: center; justify-content: center;
+            z-index: 9999; transition: opacity 0.5s ease;
         }
         .spinner {
-            width: 40px; 
-            height: 40px; 
-            border: 3px solid rgba(41, 168, 41, 0.2); 
-            border-top-color: #29A829; 
-            border-radius: 50%; 
-            animation: spin 1s linear infinite;
-            margin-bottom: 20px;
+            width: 40px; height: 40px; border: 3px solid rgba(41, 168, 41, 0.1); 
+            border-top-color: #29A829; border-radius: 50%; 
+            animation: spin 1s linear infinite; margin-bottom: 20px;
         }
         @keyframes spin { to { transform: rotate(360deg); } }
     </style>
@@ -84,13 +73,14 @@
 {
   "imports": {
     "react": "https://esm.sh/react@19.0.0",
-    "react/": "https://esm.sh/react@19.0.0/",
     "react-dom": "https://esm.sh/react-dom@19.0.0",
-    "react-dom/": "https://esm.sh/react-dom@19.0.0/",
     "react-dom/client": "https://esm.sh/react-dom@19.0.0/client",
     "react-router-dom": "https://esm.sh/react-router-dom@7.1.3?deps=react@19.0.0,react-dom@19.0.0",
     "lucide-react": "https://esm.sh/lucide-react@0.474.0?deps=react@19.0.0",
-    "@google/genai": "https://esm.sh/@google/genai@1.41.0"
+    "@google/genai": "https://esm.sh/@google/genai@1.41.0",
+    "@neondatabase/serverless": "https://esm.sh/@neondatabase/serverless@0.10.4",
+    "react-dom/": "https://esm.sh/react-dom@^19.2.4/",
+    "react/": "https://esm.sh/react@^19.2.4/"
   }
 }
 </script>
@@ -99,7 +89,7 @@
 <body>
     <div id="app-loader">
         <div class="spinner"></div>
-        <div id="loader-text" style="color: #444; font-size: 10px; font-weight: 900; letter-spacing: 0.2em; text-transform: uppercase; font-style: italic;">Initializing StreamX Engine</div>
+        <div id="loader-text" style="color: #444; font-size: 10px; font-weight: 900; letter-spacing: 0.2em; text-transform: uppercase; font-style: italic; text-align: center;">Initializing StreamX Engine</div>
     </div>
     <div id="root"></div>
 <script type="module" src="/index.tsx"></script>

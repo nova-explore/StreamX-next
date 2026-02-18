@@ -1,8 +1,11 @@
+import { neon } from '@neondatabase/serverless';
 import { Media, StorageKey, AppSettings } from '../types';
 
-const INITIAL_DATA: Media[] = [
+// Connect to Neon
+const sql = neon(process.env.DATABASE_URL || '');
+
+const INITIAL_DATA_SEED: Omit<Media, 'id' | 'createdAt'>[] = [
   {
-    id: '1',
     title: 'Echoes of the Void',
     type: 'movie',
     thumbnailUrl: 'https://images.unsplash.com/photo-1614850523296-d8c1af93d400?auto=format&fit=crop&q=80&w=1280',
@@ -10,128 +13,134 @@ const INITIAL_DATA: Media[] = [
     description: 'In a distant future, a lone explorer discovers a forgotten frequency that could rewrite history.',
     year: 2024,
     genre: 'Sci-Fi',
-    rating: 8.5,
-    createdAt: Date.now()
-  },
-  {
-    id: '2',
-    title: 'Neon Nights',
-    type: 'series',
-    thumbnailUrl: 'https://images.unsplash.com/photo-1614728263952-84ea256f9679?auto=format&fit=crop&q=80&w=1280',
-    description: 'Crime runs deep in the shadows of Neo-Tokyo. Follow a rogue detective on a path of vengeance.',
-    seasons: [
-      {
-        id: 's1',
-        seasonNumber: 1,
-        episodes: [
-          { id: 'ep1', title: 'The Red Signal', videoUrl: 'https://storage.googleapis.com/gtv-videos-bucket/sample/ElephantsDream.mp4', order: 1, duration: '45m', description: 'Detective Sato encounters a mysterious transmission that leads to a hidden underground network.' },
-          { id: 'ep2', title: 'Chrome Shadows', videoUrl: 'https://storage.googleapis.com/gtv-videos-bucket/sample/TearsOfSteel.mp4', order: 2, duration: '42m', description: 'The hunt intensifies as the Yakuza-tech hybrid soldiers start tracking Sato\'s every move.' }
-        ]
-      }
-    ],
-    year: 2023,
-    genre: 'Cyberpunk',
-    rating: 9.2,
-    createdAt: Date.now() - 100000
+    rating: 8.5
   }
 ];
 
-const DEFAULT_SETTINGS: AppSettings = {
-  isMaintenanceMode: false
-};
-
-const isStorageAvailable = () => {
-  try {
-    const key = '__storage_test__';
-    window.localStorage.setItem(key, key);
-    window.localStorage.removeItem(key);
-    return true;
-  } catch (e) {
-    return false;
-  }
-};
-
 export const storageService = {
-  getMedia: (): Media[] => {
-    if (!isStorageAvailable()) return INITIAL_DATA;
-    const data = localStorage.getItem(StorageKey.MEDIA);
-    if (!data) {
-      localStorage.setItem(StorageKey.MEDIA, JSON.stringify(INITIAL_DATA));
-      return INITIAL_DATA;
-    }
+  // Initialize Database Tables
+  init: async () => {
+    if (!process.env.DATABASE_URL) return;
     try {
-      return JSON.parse(data);
+      await sql`
+        CREATE TABLE IF NOT EXISTS media (
+          id TEXT PRIMARY KEY,
+          title TEXT NOT NULL,
+          type TEXT NOT NULL,
+          thumbnail_url TEXT,
+          backdrop_url TEXT,
+          video_url TEXT,
+          seasons JSONB,
+          description TEXT,
+          year INTEGER,
+          genre TEXT,
+          rating DECIMAL,
+          created_at BIGINT
+        )
+      `;
+      await sql`
+        CREATE TABLE IF NOT EXISTS settings (
+          id TEXT PRIMARY KEY,
+          is_maintenance_mode BOOLEAN DEFAULT FALSE
+        )
+      `;
+      // Seed if empty
+      const count = await sql`SELECT COUNT(*) FROM media`;
+      if (parseInt(count[0].count) === 0) {
+        for (const item of INITIAL_DATA_SEED) {
+          await storageService.addMedia(item);
+        }
+      }
     } catch (e) {
-      console.error("Failed to parse media data", e);
-      return INITIAL_DATA;
+      console.error("DB Initialization failed:", e);
     }
   },
 
-  addMedia: (media: Omit<Media, 'id' | 'createdAt'>): Media => {
-    const current = storageService.getMedia();
-    const newItem: Media = {
-      ...media,
-      id: Math.random().toString(36).substring(2, 11),
-      createdAt: Date.now()
-    };
-    const updated = [newItem, ...current];
-    if (isStorageAvailable()) {
-      localStorage.setItem(StorageKey.MEDIA, JSON.stringify(updated));
-    }
-    return newItem;
-  },
-
-  deleteMedia: (id: string): Media[] => {
-    const current = storageService.getMedia();
-    const updated = current.filter(item => String(item.id) !== String(id));
-    if (isStorageAvailable()) {
-      localStorage.setItem(StorageKey.MEDIA, JSON.stringify(updated));
-    }
-    return updated;
-  },
-
-  updateMedia: (media: Media) => {
-    if (!media.id) return;
-    const current = storageService.getMedia();
-    const updated = current.map(item => String(item.id) === String(media.id) ? media : item);
-    if (isStorageAvailable()) {
-      localStorage.setItem(StorageKey.MEDIA, JSON.stringify(updated));
+  getMedia: async (): Promise<Media[]> => {
+    try {
+      const rows = await sql`SELECT * FROM media ORDER BY created_at DESC`;
+      return rows.map(r => ({
+        id: r.id,
+        title: r.title,
+        type: r.type as any,
+        thumbnailUrl: r.thumbnail_url,
+        backdropUrl: r.backdrop_url,
+        videoUrl: r.video_url,
+        seasons: r.seasons,
+        description: r.description,
+        year: r.year,
+        genre: r.genre,
+        rating: parseFloat(r.rating),
+        createdAt: parseInt(r.created_at)
+      }));
+    } catch (e) {
+      console.error("Fetch failed", e);
+      return [];
     }
   },
 
+  addMedia: async (media: Omit<Media, 'id' | 'createdAt'>): Promise<Media> => {
+    const id = Math.random().toString(36).substring(2, 11);
+    const createdAt = Date.now();
+    await sql`
+      INSERT INTO media (id, title, type, thumbnail_url, backdrop_url, video_url, seasons, description, year, genre, rating, created_at)
+      VALUES (${id}, ${media.title}, ${media.type}, ${media.thumbnailUrl}, ${media.backdropUrl}, ${media.videoUrl || null}, ${JSON.stringify(media.seasons || [])}, ${media.description}, ${media.year}, ${media.genre}, ${media.rating}, ${createdAt})
+    `;
+    return { ...media, id, createdAt };
+  },
+
+  deleteMedia: async (id: string): Promise<void> => {
+    await sql`DELETE FROM media WHERE id = ${id}`;
+  },
+
+  updateMedia: async (media: Media): Promise<void> => {
+    await sql`
+      UPDATE media SET 
+        title = ${media.title},
+        type = ${media.type},
+        thumbnail_url = ${media.thumbnailUrl},
+        backdrop_url = ${media.backdropUrl},
+        video_url = ${media.videoUrl || null},
+        seasons = ${JSON.stringify(media.seasons || [])},
+        description = ${media.description},
+        year = ${media.year},
+        genre = ${media.genre},
+        rating = ${media.rating}
+      WHERE id = ${media.id}
+    `;
+  },
+
+  getSettings: async (): Promise<AppSettings> => {
+    try {
+      const rows = await sql`SELECT * FROM settings WHERE id = 'global'`;
+      if (rows.length === 0) return { isMaintenanceMode: false };
+      return { isMaintenanceMode: rows[0].is_maintenance_mode };
+    } catch {
+      return { isMaintenanceMode: false };
+    }
+  },
+
+  updateSettings: async (settings: AppSettings) => {
+    await sql`
+      INSERT INTO settings (id, is_maintenance_mode) 
+      VALUES ('global', ${settings.isMaintenanceMode})
+      ON CONFLICT (id) DO UPDATE SET is_maintenance_mode = ${settings.isMaintenanceMode}
+    `;
+  },
+
+  // Helper for local preferences
   getWatchedProgress: (id: string): number => {
-    if (!isStorageAvailable()) return 0;
-    const progressData = localStorage.getItem(StorageKey.WATCHED_PROGRESS);
-    if (!progressData) return 0;
+    const data = localStorage.getItem(StorageKey.WATCHED_PROGRESS);
+    if (!data) return 0;
     try {
-      const progressMap = JSON.parse(progressData);
-      return progressMap[id] || 0;
-    } catch (e) {
-      return 0;
-    }
+      return JSON.parse(data)[id] || 0;
+    } catch { return 0; }
   },
 
   setWatchedProgress: (id: string, progress: number) => {
-    if (!isStorageAvailable()) return;
-    const progressData = localStorage.getItem(StorageKey.WATCHED_PROGRESS);
-    const progressMap = progressData ? JSON.parse(progressData) : {};
-    progressMap[id] = progress;
-    localStorage.setItem(StorageKey.WATCHED_PROGRESS, JSON.stringify(progressMap));
-  },
-
-  getSettings: (): AppSettings => {
-    if (!isStorageAvailable()) return DEFAULT_SETTINGS;
-    const data = localStorage.getItem(StorageKey.SETTINGS);
-    try {
-      return data ? JSON.parse(data) : DEFAULT_SETTINGS;
-    } catch (e) {
-      return DEFAULT_SETTINGS;
-    }
-  },
-
-  updateSettings: (settings: AppSettings) => {
-    if (isStorageAvailable()) {
-      localStorage.setItem(StorageKey.SETTINGS, JSON.stringify(settings));
-    }
+    const data = localStorage.getItem(StorageKey.WATCHED_PROGRESS);
+    const map = data ? JSON.parse(data) : {};
+    map[id] = progress;
+    localStorage.setItem(StorageKey.WATCHED_PROGRESS, JSON.stringify(map));
   }
 };
